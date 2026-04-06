@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>🌟 خريطة الذاكرة - نجوم لا تموت 🌟</title>
+    <!-- Leaflet -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Font Awesome 6 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- Chart.js للخريطة الحرارية والإحصائيات -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <!-- html2canvas لتحويل البطاقة إلى صورة -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Cairo', 'Tahoma', sans-serif;
+            background: linear-gradient(145deg, #e0ebe0 0%, #c8dbc8 100%);
+            transition: all 0.3s;
+            padding: 20px;
+            overflow-x: hidden;
+        }
+        body.night-mode {
+            background: linear-gradient(145deg, #1a2a2a 0%, #0f1f1f 100%);
+            color: #eee;
+        }
+        /* خلفية متحركة (نجوم وزهور) */
+        .animated-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+            overflow: hidden;
+        }
+        .star, .flower {
+            position: absolute;
+            font-size: 20px;
+            animation: floatAnim linear infinite;
+            opacity: 0.6;
+        }
+        @keyframes floatAnim {
+            0% { transform: translateY(100vh) rotate(0deg); opacity: 0; }
+            10% { opacity: 0.8; }
+            90% { opacity: 0.8; }
+            100% { transform: translateY(-20vh) rotate(360deg); opacity: 0; }
+        }
+        .container {
+            position: relative;
+            z-index: 2;
+            max-width: 1600px;
+            margin: auto;
+            background: rgba(255,255,255,0.92);
+            backdrop-filter: blur(2px);
+            border-radius: 48px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        body.night-mode .container { background: rgba(30,40,40,0.92); }
+        header {
+            background: #1e3a2f;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            position: relative;
+        }
+        .music-control {
+            position: absolute;
+            left: 20px;
+            top: 20px;
+            background: rgba(0,0,0,0.5);
+            border: none;
+            color: gold;
+            font-size: 1.5rem;
+            border-radius: 50%;
+            width: 45px;
+            height: 45px;
+            cursor: pointer;
+            z-index: 20;
+        }
+        .mode-toggle {
+            position: absolute;
+            right: 20px;
+            top: 20px;
+            background: rgba(0,0,0,0.5);
+            border: none;
+            color: white;
+            font-size: 1.5rem;
+            border-radius: 50%;
+            width: 45px;
+            height: 45px;
+            cursor: pointer;
+        }
+        .stars-badge {
+            display: inline-block;
+            background: gold;
+            color: #1e3a2f;
+            padding: 4px 12px;
+            border-radius: 40px;
+            font-weight: bold;
+            margin-top: 8px;
+        }
+        .stats-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            padding: 15px 20px;
+            background: #e9f0e5;
+            justify-content: space-between;
+        }
+        body.night-mode .stats-bar { background: #2e4a3a; }
+        .stats-card {
+            background: white;
+            border-radius: 28px;
+            padding: 8px 18px;
+            flex: 1;
+            text-align: center;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .stats-card span { font-size: 1.8rem; font-weight: bold; color: #1e3a2f; display: block; }
+        .tabs {
+            display: flex;
+            background: #f4f0e0;
+            padding: 5px 20px;
+            gap: 15px;
+        }
+        .tab-btn {
+            background: none;
+            border: none;
+            padding: 8px 20px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 30px;
+        }
+        .tab-btn.active { background: #1e3a2f; color: white; }
+        .tab-content { display: none; padding: 20px; }
+        .tab-content.active { display: block; }
+        .main-flex { display: flex; flex-wrap: wrap; }
+        .form-side { flex: 1.2; min-width: 300px; padding: 20px; background: #fffaf0; }
+        .map-side { flex: 2.5; padding: 20px; }
+        #map { height: 500px; border-radius: 28px; border: 2px solid #2c5e2e; }
+        input, select, textarea, button {
+            width: 100%;
+            padding: 10px;
+            border-radius: 28px;
+            border: 1px solid #ccc;
+            margin-bottom: 12px;
+        }
+        button { background: #1e3a2f; color: white; font-weight: bold; cursor: pointer; border: none; transition: 0.2s; }
+        button:hover { transform: scale(1.02); background: #0f2a21; }
+        .image-preview img { width: 80px; height: 80px; border-radius: 50%; object-fit: cover; }
+        .user-list { max-height: 350px; overflow-y: auto; background: #f9f9f9; border-radius: 28px; padding: 10px; margin-top: 15px; }
+        .user-item { display: flex; align-items: center; gap: 12px; padding: 10px; border-bottom: 1px solid #ddd; cursor: pointer; }
+        .leaderboard { background: #f3efdd; border-radius: 28px; padding: 15px; }
+        .family-tree { background: #e6f0e6; border-radius: 28px; padding: 15px; }
+        .share-buttons { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+        .share-btn { width: auto; padding: 6px 12px; font-size: 0.8rem; background: #2c6e9e; }
+        .chat-box { background: white; border-radius: 20px; padding: 10px; margin-top: 10px; max-height: 200px; overflow-y: auto; }
+        .comment { background: #eef; margin: 5px; padding: 5px; border-radius: 16px; }
+        @media (max-width: 800px) { .main-flex { flex-direction: column; } }
+        .heart-explosion { position: fixed; pointer-events: none; font-size: 30px; animation: explode 0.8s ease-out forwards; z-index: 9999; }
+        @keyframes explode { 0% { transform: scale(0.5); opacity: 1; } 100% { transform: scale(2); opacity: 0; } }
+    </style>
+</head>
+<body>
+<div class="animated-bg" id="animatedBg"></div>
+<div class="container">
+    <header>
+        <button class="music-control" id="musicToggle"><i class="fas fa-music"></i></button>
+        <button class="mode-toggle" id="modeToggle"><i class="fas fa-moon"></i></button>
+        <h1>🌟 خريطة الذاكرة الأبدية 🌟</h1>
+        <p>معهد التمريض بالمنيا - نحن لسنا أرقاماً، نحن نجوم لا تموت</p>
+        <div class="stars-badge" id="userStarsBadge">⭐ 0 نجمة</div>
+    </header>
+
+    <div class="stats-bar">
+        <div class="stats-card">👥 <span id="totalCount">0</span><br>مخلد</div>
+        <div class="stats-card">⭐ <span id="totalStars">0</span><br>مجموع النجوم</div>
+        <div class="stats-card">📅 <span id="targetPercent">0%</span><br>نسبة التغطية</div>
+    </div>
+
+    <div class="tabs">
+        <button class="tab-btn active" data-tab="main">🗺️ الخريطة</button>
+        <button class="tab-btn" data-tab="family">👨‍👩‍👧‍👦 الرابط العائلي</button>
+        <button class="tab-btn" data-tab="leaderboard">🏆 المتصدرين</button>
+        <button class="tab-btn" data-tab="heatmap">🔥 الخريطة الحرارية</button>
+    </div>
+
+    <!-- تبويب الخريطة الرئيسي -->
+    <div id="tab-main" class="tab-content active">
+        <div class="main-flex">
+            <div class="form-side">
+                <h3>✨ أضف ذكرى خالدة ✨</h3>
+                <input type="text" id="name" placeholder="الاسم الكامل">
+                <input type="number" id="age" placeholder="العمر">
+                <input type="date" id="birthdate">
+                <input type="text" id="gradYear" placeholder="سنة الالتحاق">
+                <select id="governorate"><option value="">المحافظة</option></select>
+                <textarea id="memorialMsg" rows="2" placeholder="رسالة تذكارية (دعاء، كلمة)"></textarea>
+                <input type="file" id="imageUpload" accept="image/*">
+                <div class="image-preview" id="imagePreview"></div>
+                <input type="text" id="videoLink" placeholder="رابط فيديو يوتيوب (اختياري)">
+                <button id="saveBtn"><i class="fas fa-heart"></i> أضف ذكرى + انفجار قلوب</button>
+            </div>
+            <div class="map-side">
+                <div id="map"></div>
+                <div class="share-buttons" id="globalShare">
+                    <button class="share-btn" data-platform="whatsapp"><i class="fab fa-whatsapp"></i> واتساب</button>
+                    <button class="share-btn" data-platform="facebook"><i class="fab fa-facebook"></i> فيسبوك</button>
+                    <button class="share-btn" data-platform="twitter"><i class="fab fa-twitter"></i> تويتر</button>
+                    <button class="share-btn" data-platform="telegram"><i class="fab fa-telegram"></i> تلغرام</button>
+                    <button class="share-btn" data-platform="copy"><i class="fas fa-link"></i> نسخ الرابط</button>
+                </div>
+                <div class="user-list" id="userList"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- تبويب الرابط العائلي -->
+    <div id="tab-family" class="tab-content">
+        <div class="family-tree">
+            <h3>🔗 رابط عائلي - اربط بين الأصدقاء والعائلة</h3>
+            <p>أنشئ مجموعة عائلية وشارك الكود مع أحبائك ليضيفوا ذكرياتهم تحت نفس المظلة.</p>
+            <input type="text" id="familyName" placeholder="اسم العائلة أو المجموعة">
+            <button id="createFamilyBtn">إنشاء رابط عائلي + كود</button>
+            <div id="familyCodeDisplay" style="margin-top:10px; font-weight:bold;"></div>
+            <button id="joinFamilyBtn" style="background:#6c8b6e;">انضم لعائلة عبر الكود</button>
+            <input type="text" id="joinCode" placeholder="أدخل الكود السري">
+            <div id="familyMembersList" style="margin-top:20px;"></div>
+        </div>
+    </div>
+
+    <!-- تبويب المتصدرين -->
+    <div id="tab-leaderboard" class="tab-content">
+        <div class="leaderboard" id="leaderboardDiv"></div>
+    </div>
+
+    <!-- تبويب الخريطة الحرارية -->
+    <div id="tab-heatmap" class="tab-content">
+        <canvas id="heatmapChart" width="400" height="300" style="max-width:100%; background:#f0f0f0; border-radius:28px;"></canvas>
+    </div>
+</div>
+
+<audio id="bgMusic" loop preload="auto">
+    <source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3" type="audio/mpeg">
+</audio>
+<audio id="clickSound" preload="auto">
+    <source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3" type="audio/mpeg">
+</audio>
+
+<script>
+    // ------------------- الإحداثيات ------------------
+    const govCoords = {
+        "القاهرة":[30.0444,31.2357], "الإسكندرية":[31.2001,29.9187], "الجيزة":[29.987,31.2118], "المنيا":[28.1099,30.7500],
+        "أسوان":[24.0889,32.8998], "الأقصر":[25.6872,32.6396], "بورسعيد":[31.2653,32.3019], "السويس":[29.9737,32.5263],
+        "الدقهلية":[31.036,31.380], "الشرقية":[30.736,31.636], "الغربية":[30.875,31.033], "القليوبية":[30.191,31.208],
+        "الإسماعيلية":[30.583,32.265], "كفر الشيخ":[31.111,30.939], "الفيوم":[29.308,30.842], "بني سويف":[29.066,31.099],
+        "أسيوط":[27.178,31.185], "سوهاج":[26.558,31.694], "قنا":[26.166,32.717], "البحيرة":[31.106,30.395],
+        "مطروح":[31.354,27.237], "شمال سيناء":[31.042,33.632], "جنوب سيناء":[29.515,34.894], "الوادي الجديد":[25.515,28.973],
+        "دمياط":[31.416,31.813], "المنوفية":[30.597,30.987]
+    };
+    const govList = Object.keys(govCoords);
+    const govSelect = document.getElementById('governorate');
+    govList.forEach(g => { let opt = document.createElement('option'); opt.value=g; opt.textContent=g; govSelect.appendChild(opt); });
+
+    // ------------------- البيانات الأساسية ------------------
+    let users = [];
+    let families = []; // { id, name, code, members: [userId] }
+    let totalEstimated = 800; // العدد التقريبي لطلاب المعهد
+    let currentUserId = localStorage.getItem("currentUserId") || "user_" + Math.random().toString(36).substr(2, 8);
+    localStorage.setItem("currentUserId", currentUserId);
+    let userStars = JSON.parse(localStorage.getItem("userStars")) || {};
+
+    // تحميل وحفظ
+    function loadData() {
+        const stored = localStorage.getItem("starMemoryUsers");
+        if(stored) users = JSON.parse(stored);
+        const fam = localStorage.getItem("starMemoryFamilies");
+        if(fam) families = JSON.parse(fam);
+        renderAll();
+    }
+    function saveData() {
+        localStorage.setItem("starMemoryUsers", JSON.stringify(users));
+        localStorage.setItem("starMemoryFamilies", JSON.stringify(families));
+        localStorage.setItem("userStars", JSON.stringify(userStars));
+    }
+
+    // حساب نجوم المستخدم (كل 5 إضافات = نجمة)
+    function updateUserStars() {
+        let userAddCount = users.filter(u => u.addedBy === currentUserId).length;
+        let stars = Math.floor(userAddCount / 5);
+        userStars[currentUserId] = stars;
+        document.getElementById("userStarsBadge").innerHTML = `⭐ ${stars} نجمة`;
+        let totalStarsAll = Object.values(userStars).reduce((a,b)=>a+b,0);
+        document.getElementById("totalStars").innerText = totalStarsAll;
+        saveData();
+    }
+
+    // المؤثرات الصوتية
+    let musicPlaying = false;
+    const bgMusic = document.getElementById("bgMusic");
+    const clickSound = document.getElementById("clickSound");
+    document.getElementById("musicToggle").onclick = () => {
+        if(musicPlaying) { bgMusic.pause(); musicPlaying=false; } 
+        else { bgMusic.play().catch(e=>console.log); musicPlaying=true; }
+    };
+    function playClick() { clickSound.play().catch(e=>console.log); }
+
+    // انفجار قلوب
+    function explodeHearts(x,y) {
+        for(let i=0;i<15;i++) {
+            let heart = document.createElement('div');
+            heart.innerHTML = ['❤️','💖','💗','💓','💕'][Math.floor(Math.random()*5)];
+            heart.className = 'heart-explosion';
+            heart.style.left = (x + (Math.random()*100-50)) + 'px';
+            heart.style.top = (y + (Math.random()*100-50)) + 'px';
+            document.body.appendChild(heart);
+            setTimeout(()=>heart.remove(),800);
+        }
+    }
+
+    // الخريطة والنقاط
+    let map, markersLayer;
+    function initMap() {
+        map = L.map('map').setView([26.8,30.8],6);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{attribution:'OSM'}).addTo(map);
+        markersLayer = L.layerGroup().addTo(map);
+    }
+    function renderAll() {
+        if(!map) initMap();
+        markersLayer.clearLayers();
+        const listDiv = document.getElementById('userList');
+        listDiv.innerHTML = "";
+        users.forEach(user => {
+            const coords = govCoords[user.governorate];
+            if(coords){
+                const heartIcon = L.divIcon({html:'<i class="fas fa-heart" style="color:#e63946; font-size:26px;"></i>', iconSize:[26,26]});
+                const marker = L.marker(coords, {icon:heartIcon}).addTo(markersLayer);
+                const msg = user.memorialMsg ? `<p><i class="fas fa-comment"></i> "${user.memorialMsg}"</p>` : "";
+                const video = user.videoLink ? `<a href="${user.videoLink}" target="_blank"><i class="fab fa-youtube"></i> فيديو تذكاري</a>` : "";
+                const popup = `<div style="text-align:center;">
+                    ${user.imageData ? `<img src="${user.imageData}" style="width:80px;border-radius:50%;">` : '<div>📷</div>'}
+                    <h3>${user.name}</h3>
+                    <p>العمر: ${user.age}<br>المحافظة: ${user.governorate}<br>${user.gradYear ? `سنة ${user.gradYear}` : ''}</p>
+                    ${msg} ${video}
+                    <div class="share-buttons" style="justify-content:center;">
+                        <button class="share-single" data-name="${user.name}" data-gov="${user.governorate}" data-msg="${user.memorialMsg||''}"><i class="fab fa-whatsapp"></i> شارك</button>
+                    </div>
+                </div>`;
+                marker.bindPopup(popup);
+                // قائمة جانبية
+                const item = document.createElement('div');
+                item.className = 'user-item';
+                item.innerHTML = `<div>${user.imageData ? `<img src="${user.imageData}">` : '👤'}</div>
+                                <div><strong>${user.name}</strong> (${user.age}) - ${user.governorate}<br><small>${user.memorialMsg?.substring(0,30)}</small></div>
+                                <button class="delete-user" data-id="${user.id}" style="background:#a13e3e; width:auto;">🗑️</button>`;
+                item.querySelector('.delete-user')?.addEventListener('click',(e)=>{ e.stopPropagation(); deleteUser(user.id); });
+                item.onclick = () => { map.setView(coords,12); marker.openPopup(); };
+                listDiv.appendChild(item);
+            }
+        });
+        document.getElementById('totalCount').innerText = users.length;
+        let percent = (users.length / totalEstimated)*100;
+        document.getElementById('targetPercent').innerHTML = `${percent.toFixed(1)}% (هدف 89%)`;
+        updateUserStars();
+        updateLeaderboard();
+        updateHeatmap();
+        updateFamilyDisplay();
+    }
+
+    function deleteUser(id){
+        if(confirm("حذف الذكرى؟")){ users = users.filter(u=>u.id!=id); saveData(); renderAll(); playClick(); }
+    }
+
+    function addUser(name,age,birthdate,gov,imageData,gradYear,msg,videoLink){
+        if(!name||!age||!gov){ alert("املأ البيانات الأساسية"); return false; }
+        const newUser = { id:Date.now(), name, age, birthdate, governorate:gov, imageData:imageData||null, gradYear, memorialMsg:msg, videoLink, addedBy:currentUserId, createdAt:new Date() };
+        users.push(newUser);
+        saveData();
+        renderAll();
+        // انفجار قلوب عند الإضافة
+        explodeHearts(window.innerWidth/2, window.innerHeight/2);
+        playClick();
+        return true;
+    }
+
+    // مشاركة متعددة المنصات
+    function shareMemory(platform, name, gov, msg){
+        const text = `🕊️ ذكرى خالدة: ${name} من ${gov} - ${msg}\n\nمشروع خريطة الذاكرة - معهد التمريض بالمنيا\n${window.location.href}`;
+        const url = window.location.href;
+        if(platform==='whatsapp') window.open(`https://wa.me/?text=${encodeURIComponent(text)}`,'_blank');
+        else if(platform==='facebook') window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}&quote=${encodeURIComponent(text)}`,'_blank');
+        else if(platform==='twitter') window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`,'_blank');
+        else if(platform==='telegram') window.open(`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`,'_blank');
+        else if(platform==='copy') { navigator.clipboard.writeText(text); alert("تم نسخ الرابط والرسالة"); }
+    }
+    document.querySelectorAll('.share-btn').forEach(btn=>{
+        btn.onclick = () => shareMemory(btn.dataset.platform, "زملاء المعهد", "المنيا", "ذكرى عطرة");
+    });
+
+    // لوحة المتصدرين
+    function updateLeaderboard(){
+        let counter = {};
+        users.forEach(u=>{ counter[u.addedBy] = (counter[u.addedBy]||0)+1; });
+        let sorted = Object.entries(counter).sort((a,b)=>b[1]-a[1]);
+        let html = "<h3>🏅 أكثر من أضافوا ذكريات</h3><ol>";
+        sorted.slice(0,10).forEach(([id,count])=>{
+            let starCount = userStars[id]||0;
+            html += `<li>المساهم ${id.substring(0,6)} - ${count} ذكرى ⭐ ${starCount} نجمة</li>`;
+        });
+        html += "</ol>";
+        document.getElementById("leaderboardDiv").innerHTML = html;
+    }
+
+    // خريطة حرارية (Chart.js)
+    let heatChart;
+    function updateHeatmap(){
+        let govCount = {};
+        users.forEach(u=>{ govCount[u.governorate] = (govCount[u.governorate]||0)+1; });
+        let labels = govList.slice(0,10);
+        let data = labels.map(l=> govCount[l]||0);
+        const ctx = document.getElementById('heatmapChart').getContext('2d');
+        if(heatChart) heatChart.destroy();
+        heatChart = new Chart(ctx, { type:'bar', data:{ labels, datasets:[{ label:'عدد الذكريات', data, backgroundColor:'#e63946' }] }, options:{ responsive:true } });
+    }
+
+    // نظام العائلات
+    function createFamily(name){
+        let code = Math.random().toString(36).substr(2,6).toUpperCase();
+        let newFamily = { id:Date.now(), name, code, members:[currentUserId] };
+        families.push(newFamily);
+        saveData();
+        document.getElementById("familyCodeDisplay").innerHTML = `كود العائلة: <strong>${code}</strong> - شاركه مع أصدقائك`;
+        renderAll();
+    }
+    function joinFamily(code){
+        let family = families.find(f=>f.code===code);
+        if(family && !family.members.includes(currentUserId)){
+            family.members.push(currentUserId);
+            saveData();
+            alert("انضممت إلى العائلة بنجاح!");
+            renderAll();
+        } else alert("كود غير صحيح أو أنك بالفعل عضو");
+    }
+    function updateFamilyDisplay(){
+        let myFamilies = families.filter(f=>f.members.includes(currentUserId));
+        let html = "<h4>عائلاتي:</h4>";
+        myFamilies.forEach(f=>{
+            html += `<div><strong>${f.name}</strong> (كود: ${f.code}) - الأعضاء: ${f.members.length}</div>`;
+        });
+        document.getElementById("familyMembersList").innerHTML = html;
+    }
+    document.getElementById("createFamilyBtn").onclick = ()=>{
+        let fname = document.getElementById("familyName").value;
+        if(fname) createFamily(fname);
+        else alert("أدخل اسم العائلة");
+    };
+    document.getElementById("joinFamilyBtn").onclick = ()=>{
+        let code = document.getElementById("joinCode").value;
+        if(code) joinFamily(code);
+    };
+
+    // حفظ الإضافة
+    let currentImageData = null;
+    document.getElementById('imageUpload').addEventListener('change',(e)=>{
+        let file = e.target.files[0];
+        if(file){
+            let reader = new FileReader();
+            reader.onload = (ev)=>{ currentImageData = ev.target.result; document.getElementById('imagePreview').innerHTML = `<img src="${currentImageData}">`; };
+            reader.readAsDataURL(file);
+        }
+    });
+    document.getElementById('saveBtn').onclick = ()=>{
+        let name = document.getElementById('name').value.trim();
+        let age = document.getElementById('age').value.trim();
+        let birth = document.getElementById('birthdate').value;
+        let gov = document.getElementById('governorate').value;
+        let grad = document.getElementById('gradYear').value;
+        let msg = document.getElementById('memorialMsg').value;
+        let video = document.getElementById('videoLink').value;
+        if(!name || !age || !gov) { alert("الاسم والعمر والمحافظة مطلوبة"); return; }
+        addUser(name,age,birth,gov,currentImageData,grad,msg,video);
+        // مسح الحقول
+        document.getElementById('name').value=''; document.getElementById('age').value=''; document.getElementById('birthdate').value='';
+        document.getElementById('governorate').value=''; document.getElementById('gradYear').value=''; document.getElementById('memorialMsg').value='';
+        document.getElementById('videoLink').value=''; document.getElementById('imageUpload').value=''; document.getElementById('imagePreview').innerHTML='';
+        currentImageData=null;
+        alert("تمت إضافة الذكرى ✨ مع انفجار قلوب!");
+    };
+
+    // تبديل التبويبات
+    document.querySelectorAll('.tab-btn').forEach(btn=>{
+        btn.onclick = ()=>{
+            document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+            btn.classList.add('active');
+            document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+            document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
+        };
+    });
+
+    // الوضع الليلي والخلفية المتحركة
+    document.getElementById('modeToggle').onclick = ()=>{
+        document.body.classList.toggle('night-mode');
+        let icon = document.getElementById('modeToggle').querySelector('i');
+        if(document.body.classList.contains('night-mode')) icon.className = 'fas fa-sun';
+        else icon.className = 'fas fa-moon';
+    };
+    function createFloatingElements(){
+        let container = document.getElementById('animatedBg');
+        for(let i=0;i<50;i++){
+            let el = document.createElement('div');
+            el.className = Math.random()>0.5 ? 'star' : 'flower';
+            el.innerHTML = Math.random()>0.5 ? '⭐' : ['🌸','🌼','🌻','✨','💫'][Math.floor(Math.random()*5)];
+            el.style.left = Math.random()*100 + '%';
+            el.style.animationDuration = 5+Math.random()*15 + 's';
+            el.style.animationDelay = Math.random()*10 + 's';
+            el.style.fontSize = 15+Math.random()*25 + 'px';
+            container.appendChild(el);
+        }
+    }
+    createFloatingElements();
+    loadData();
+</script>
+</body>
+</html>
